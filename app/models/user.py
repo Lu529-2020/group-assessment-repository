@@ -47,7 +47,7 @@ class User(BaseModel):
         Args:
             password (str): The plain-text password to hash.
         """
-        pass
+        self.password_hash = generate_password_hash(password)
 
     def check_password(self, password: str) -> bool:
         """
@@ -59,7 +59,9 @@ class User(BaseModel):
         Returns:
             bool: True if the password is correct, False otherwise.
         """
-        pass
+        if self.password_hash is None:
+            return False # Cannot check password if no hash is stored.
+        return check_password_hash(self.password_hash, password)
 
     def to_dict(self) -> dict:
         """
@@ -68,7 +70,13 @@ class User(BaseModel):
         Returns:
             dict: A dictionary containing the user's attributes suitable for JSON serialization.
         """
-        pass
+        data = super().to_dict() # Get common fields from BaseModel.
+        data.update({
+            'username': self.username,
+            'role': self.role,
+            'student_id': self.student_id,
+        })
+        return data
 
     @classmethod
     def from_row(cls, row) -> 'User':
@@ -85,7 +93,31 @@ class User(BaseModel):
         Returns:
             User: A User instance populated with data from the row, or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance: # Should not happen if row is not None, but as a safeguard.
+            return None
+
+        row_dict = dict(row) # Convert row to dict for easier access to specific fields.
+
+        # Extract user-specific fields.
+        username = row_dict.get('username')
+        password_hash = row_dict.get('password_hash')
+        role = row_dict.get('role')
+        student_id = row_dict.get('student_id')
+
+        return cls(
+            id=base_instance.id,
+            username=username,
+            password_hash=password_hash,
+            role=role,
+            student_id=student_id,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
     def __repr__(self) -> str:
         """
