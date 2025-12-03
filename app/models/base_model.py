@@ -43,7 +43,13 @@ class BaseModel:
         Returns:
             dict: A dictionary containing the common attributes (id, is_active, created_at).
         """
-        pass
+        data = {
+            'id': self.id,
+            'is_active': self.is_active,
+            # Convert datetime object to ISO 8601 string for JSON serialization.
+            'created_at': self.created_at.isoformat() if isinstance(self.created_at, datetime) else self.created_at
+        }
+        return data
 
     @classmethod
     def from_row(cls, row):
@@ -60,4 +66,37 @@ class BaseModel:
             BaseModel: A BaseModel instance (or an instance of the calling subclass)
                        populated with common fields, or None if the input row is None.
         """
-        pass
+        if row is None:
+            return None
+
+        # Convert sqlite3.Row to a standard dictionary for consistent access.
+        row_dict = dict(row)
+
+        # Extract common fields from the row dictionary.
+        record_id = row_dict.get('id')
+        active_status = bool(row_dict.get('is_active', True))  # Default to True if not present.
+
+        created_at_parsed = None
+        created_at_str = row_dict.get('created_at')
+        if created_at_str:
+            try:
+                # Attempt to parse the ISO 8601 formatted datetime string.
+                created_at_parsed = datetime.fromisoformat(created_at_str)
+            except ValueError:
+                # Log a warning if the datetime string format is invalid.
+                # Use current_app.logger if available, otherwise fall back to print.
+                if current_app:
+                    current_app.logger.warning(
+                        f"Invalid datetime format for 'created_at': '{created_at_str}' "
+                        f"for record ID {record_id}. Setting to None."
+                    )
+                else:
+                    print(
+                        f"WARNING: Invalid datetime format for 'created_at': '{created_at_str}' "
+                        f"for record ID {record_id}. Setting to None."
+                    )
+
+        # Create an instance of the specific model class (cls refers to the subclass).
+        # Subclasses will typically call this super method and then handle their
+        # specific fields.
+        return cls(id=record_id, is_active=active_status, created_at=created_at_parsed)
