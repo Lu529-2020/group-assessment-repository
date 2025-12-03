@@ -51,7 +51,27 @@ class BaseRepository:
             Exception: If a `sqlite3.Error` occurs during query execution,
                        it's caught, logged, and re-raised as a generic Exception.
         """
-        pass
+        db = get_db()
+        try:
+            cursor = db.execute(query, params)
+            if fetch_one:
+                row = cursor.fetchone()
+                if row:
+                    # If only one column is selected and not explicitly asking for dict, return the scalar value.
+                    if len(row) == 1 and not fetch_all_dicts:
+                        return row[0]
+                    # Return as dict or model instance based on flags and model_class availability.
+                    return dict(row) if fetch_all_dicts or self.model_class is None else self.model_class.from_row(row)
+                return None # No row found.
+            else:
+                rows = cursor.fetchall()
+                # Return as list of dicts or list of model instances.
+                return [dict(row) for row in rows] if fetch_all_dicts or self.model_class is None else [self.model_class.from_row(row) for row in rows]
+        except sqlite3.Error as e:
+            # Log the specific database error with full traceback.
+            current_app.logger.error(f"Database error in {self.table_name} repository (query): {e}", exc_info=True)
+            # Re-raise as a generic exception for higher layers to handle.
+            raise Exception(f"Database operation failed for {self.table_name}.")
 
     def _execute_insert(self, query, params=()):
         """
@@ -71,7 +91,13 @@ class BaseRepository:
             Exception: If a `sqlite3.Error` occurs during insertion,
                        the transaction is rolled back, the error is logged, and re-raised.
         """
-        pass
+        db = get_db()
+        try:
+            cursor = db.execute(query, params)
+            return cursor.lastrowid
+        except sqlite3.Error as e:
+            current_app.logger.error(f"Database error in {self.table_name} repository (insert): {e}", exc_info=True)
+            raise Exception(f"Failed to insert into {self.table_name}.")
 
     def _execute_update_delete(self, query, params=()):
         """
@@ -91,7 +117,13 @@ class BaseRepository:
             Exception: If a `sqlite3.Error` occurs during the operation,
                        the transaction is rolled back, the error is logged, and re-raised.
         """
-        pass
+        db = get_db()
+        try:
+            cursor = db.execute(query, params)
+            return cursor.rowcount > 0 # Indicates if any row was affected by the operation.
+        except sqlite3.Error as e:
+            current_app.logger.error(f"Database error in {self.table_name} repository (update/delete): {e}", exc_info=True)
+            raise Exception(f"Failed to update/delete from {self.table_name}.")
 
     def get_all(self, include_inactive=False):
         """
@@ -104,7 +136,10 @@ class BaseRepository:
             list: A list of model instances (or dictionaries if `model_class` is None)
                   representing all active records, or all records if `include_inactive` is True.
         """
-        pass
+        query = f"SELECT * FROM {self.table_name}"
+        if not include_inactive:
+            query += " WHERE is_active = 1"
+        return self._execute_query(query)
 
     def get_by_id(self, item_id, include_inactive=False):
         """
@@ -117,7 +152,10 @@ class BaseRepository:
         Returns:
             Any: A single model instance (or dictionary) if found, otherwise None.
         """
-        pass
+        query = f"SELECT * FROM {self.table_name} WHERE id = ?"
+        if not include_inactive:
+            query += " AND is_active = 1"
+        return self._execute_query(query, (item_id,), fetch_one=True)
 
     def delete_logical(self, item_id):
         """
@@ -132,7 +170,8 @@ class BaseRepository:
         Returns:
             bool: True if the logical delete operation was successful and affected a record, False otherwise.
         """
-        pass
+        query = f"UPDATE {self.table_name} SET is_active = 0 WHERE id = ?"
+        return self._execute_update_delete(query, (item_id,))
 
     def delete_hard(self, item_id):
         """
@@ -146,4 +185,5 @@ class BaseRepository:
         Returns:
             bool: True if the hard delete operation was successful and affected a record, False otherwise.
         """
-        pass
+        query = f"DELETE FROM {self.table_name} WHERE id = ?"
+        return self._execute_update_delete(query, (item_id,))
