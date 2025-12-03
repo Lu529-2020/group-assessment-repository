@@ -40,7 +40,7 @@ class UserRepository(BaseRepository):
         Returns:
             list[User]: A list of `User` objects representing all active (or all) users.
         """
-        pass
+        return super().get_all(include_inactive)
 
     def get_user_by_id(self, user_id: int, include_inactive: bool = False) -> User | None:
         """
@@ -53,7 +53,7 @@ class UserRepository(BaseRepository):
         Returns:
             User | None: A `User` object if found, otherwise None.
         """
-        pass
+        return super().get_by_id(user_id, include_inactive)
 
     def get_user_by_username(self, username: str, include_inactive: bool = False) -> User | None:
         """
@@ -66,7 +66,10 @@ class UserRepository(BaseRepository):
         Returns:
             User | None: A `User` object if found, otherwise None.
         """
-        pass
+        query = "SELECT * FROM users WHERE username = ?"
+        if not include_inactive:
+            query += " AND is_active = 1"
+        return self._execute_query(query, (username,), fetch_one=True)
 
     def create_user(self, username: str, password: str, role: str = 'user', student_id: int | None = None) -> User:
         """
@@ -83,7 +86,12 @@ class UserRepository(BaseRepository):
         Returns:
             User: The newly created `User` object.
         """
-        pass
+        new_user = User(username=username, role=role, student_id=student_id)
+        new_user.set_password(password) # Hash the password before storing.
+
+        query = "INSERT INTO users (username, password_hash, role, student_id, created_at, is_active) VALUES (?, ?, ?, ?, ?, ?)"
+        user_id = self._execute_insert(query, (new_user.username, new_user.password_hash, new_user.role, new_user.student_id, new_user.created_at.isoformat(), new_user.is_active))
+        return self.get_user_by_id(user_id, include_inactive=True)
 
     def update_user(self, user_id: int, username: str, role: str, is_active: bool) -> User:
         """
@@ -98,7 +106,9 @@ class UserRepository(BaseRepository):
         Returns:
             User: The updated `User` object.
         """
-        pass
+        query = "UPDATE users SET username = ?, role = ?, is_active = ? WHERE id = ?"
+        self._execute_update_delete(query, (username, role, is_active, user_id))
+        return self.get_user_by_id(user_id, include_inactive=True)
 
     def reset_password(self, user_id: int, new_password: str) -> bool:
         """
@@ -113,8 +123,11 @@ class UserRepository(BaseRepository):
         Returns:
             bool: True if the password was successfully reset (i.e., a record was updated), False otherwise.
         """
+        user = User(id=user_id) # Create a dummy user object to use set_password method.
+        user.set_password(new_password) # Hash the new password.
 
-        pass
+        query = "UPDATE users SET password_hash = ? WHERE id = ?"
+        return self._execute_update_delete(query, (user.password_hash, user_id))
 
     def delete_user(self, user_id: int) -> bool:
         """
@@ -126,7 +139,7 @@ class UserRepository(BaseRepository):
         Returns:
             bool: True if the user was successfully logically deleted, False otherwise.
         """
-        pass
+        return super().delete_logical(user_id)
 
 # Instantiate the repository for use throughout the application.
 user_repository = UserRepository()
