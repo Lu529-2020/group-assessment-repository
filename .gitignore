@@ -1,0 +1,47 @@
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 虚拟环境
+venv/
+.venv/
+env/
+ENV/
+
+# Flask instance and logs
+instance/
+*.log
+
+# SQLite Database files （避免泄露用户/测试数据）
+*.db
+*.sqlite3
+data-dev.sqlite # 明确忽略开发数据库文件
+
+# ===== Node / Vue 前端 =====
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# 根目录下的 Node.js 依赖 (如果存在且不应被提交)
+node_modules/
+
+# ===== 环境变量文件 =====
+# 存储敏感信息，不应提交到版本控制
+.env
+*.env
+
+# ===== Test Cache =====
+.pytest_cache/
+.coverage
+
+# ===== Editor / OS Files =====
+.DS_Store
+.idea/
+.vscode/
+
+# ===== Backup / Temp =====
+*.bak
+*.tmp
