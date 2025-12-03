@@ -6,3 +6,144 @@ interface for interacting with a specific database table. It encapsulates
 common CRUD (Create, Read, Update, Delete) operations and includes robust
 error handling and transaction management using SQLite.
 """
+
+import sqlite3
+from app.db_connection import get_db
+from flask import current_app # Import current_app for logging
+
+class BaseRepository:
+    """
+    A base repository class providing common database operations for a specific table.
+
+    This class is designed to be inherited by other specific repositories
+    (e.g., `UserRepository`, `ModuleRepository`) to centralize database
+    interaction logic, error handling, and transaction management.
+    """
+    def __init__(self, table_name, model_class):
+        """
+        Initializes the BaseRepository instance.
+
+        Args:
+            table_name (str): The name of the database table this repository manages.
+            model_class: The model class (e.g., `User`, `Module`) that this
+                         repository maps database rows to. If None, results are returned as dictionaries.
+        """
+        self.table_name = table_name
+        self.model_class = model_class
+
+    def _execute_query(self, query, params=(), fetch_one=False, fetch_all_dicts=False):
+        """
+        Executes a SELECT query and returns the results, optionally mapping them to model instances.
+
+        Args:
+            query (str): The SQL SELECT query string to execute.
+            params (tuple, optional): A tuple of parameters to bind to the query. Defaults to an empty tuple.
+            fetch_one (bool, optional): If True, fetches only the first matching row. Defaults to False.
+            fetch_all_dicts (bool, optional): If True, returns results as a list of dictionaries.
+                                             Overrides `model_class` if True. Defaults to False.
+
+        Returns:
+            Union[Any, List[Any], None]:
+                - If `fetch_one` is True: A single model instance, a dictionary, a single value, or None.
+                - If `fetch_one` is False: A list of model instances, a list of dictionaries, or an empty list.
+
+        Raises:
+            Exception: If a `sqlite3.Error` occurs during query execution,
+                       it's caught, logged, and re-raised as a generic Exception.
+        """
+        pass
+
+    def _execute_insert(self, query, params=()):
+        """
+        Executes an INSERT query and returns the ID of the newly inserted row.
+
+        This method ensures that the transaction is committed on success
+        and rolled back on failure.
+
+        Args:
+            query (str): The SQL INSERT query string to execute.
+            params (tuple, optional): A tuple of parameters to bind to the query. Defaults to an empty tuple.
+
+        Returns:
+            int: The `lastrowid` (ID of the newly inserted row) if the insertion is successful.
+
+        Raises:
+            Exception: If a `sqlite3.Error` occurs during insertion,
+                       the transaction is rolled back, the error is logged, and re-raised.
+        """
+        pass
+
+    def _execute_update_delete(self, query, params=()):
+        """
+        Executes an UPDATE or DELETE query.
+
+        This method ensures that the transaction is committed on success
+        and rolled back on failure.
+
+        Args:
+            query (str): The SQL UPDATE or DELETE query string to execute.
+            params (tuple, optional): A tuple of parameters to bind to the query. Defaults to an empty tuple.
+
+        Returns:
+            bool: True if the operation was successful and affected at least one row, False otherwise.
+
+        Raises:
+            Exception: If a `sqlite3.Error` occurs during the operation,
+                       the transaction is rolled back, the error is logged, and re-raised.
+        """
+        pass
+
+    def get_all(self, include_inactive=False):
+        """
+        Retrieves all records from the managed table.
+
+        Args:
+            include_inactive (bool, optional): If True, includes records marked as inactive. Defaults to False.
+
+        Returns:
+            list: A list of model instances (or dictionaries if `model_class` is None)
+                  representing all active records, or all records if `include_inactive` is True.
+        """
+        pass
+
+    def get_by_id(self, item_id, include_inactive=False):
+        """
+        Retrieves a single record by its ID from the managed table.
+
+        Args:
+            item_id (int): The ID of the record to retrieve.
+            include_inactive (bool, optional): If True, includes records marked as inactive. Defaults to False.
+
+        Returns:
+            Any: A single model instance (or dictionary) if found, otherwise None.
+        """
+        pass
+
+    def delete_logical(self, item_id):
+        """
+        Performs a logical delete on a record by setting its 'is_active' flag to 0.
+
+        This method is preferred over hard deletion to preserve historical data
+        and maintain referential integrity.
+
+        Args:
+            item_id (int): The ID of the record to logically delete.
+
+        Returns:
+            bool: True if the logical delete operation was successful and affected a record, False otherwise.
+        """
+        pass
+
+    def delete_hard(self, item_id):
+        """
+        Performs a hard delete on a record, permanently removing it from the database.
+
+        Use this method with caution, as data deleted this way cannot be recovered.
+
+        Args:
+            item_id (int): The ID of the record to permanently delete.
+
+        Returns:
+            bool: True if the hard delete operation was successful and affected a record, False otherwise.
+        """
+        pass
