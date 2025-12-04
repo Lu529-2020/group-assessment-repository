@@ -37,7 +37,17 @@ class AlertRepository(BaseRepository):
             list[dict]: A list of dictionaries, where each dictionary represents
                         an alert with joined student and module details.
         """
-        pass
+        query = """
+            SELECT a.id, a.student_id, a.module_id, a.week_number, a.reason, a.created_at, a.resolved, a.is_active,
+                   s.full_name AS student_name, m.module_title AS module_title
+            FROM alerts a
+            JOIN students s ON a.student_id = s.id
+            LEFT JOIN modules m ON a.module_id = m.id
+            WHERE a.is_active = 1
+            ORDER BY a.created_at DESC
+        """
+        # _execute_query handles exceptions and returns results as dictionaries due to fetch_all_dicts=True.
+        return self._execute_query(query, fetch_all_dicts=True)
 
     def get_recent_alerts_per_student(self) -> list[dict]:
         """
@@ -50,7 +60,23 @@ class AlertRepository(BaseRepository):
             list[dict]: A list of dictionaries, each representing the latest
                         active alert for a distinct student.
         """
-        pass
+        query = """
+            SELECT a.id, a.student_id, a.module_id, a.week_number, a.reason, a.created_at, a.resolved, a.is_active,
+                   s.full_name AS student_name, m.module_title AS module_title
+            FROM alerts a
+            JOIN students s ON a.student_id = s.id
+            LEFT JOIN modules m ON a.module_id = m.id
+            JOIN (
+                SELECT student_id, MAX(week_number) AS max_week_number
+                FROM alerts
+                WHERE is_active = 1
+                GROUP BY student_id
+            ) AS latest_alerts
+            ON a.student_id = latest_alerts.student_id AND a.week_number = latest_alerts.max_week_number
+            WHERE a.is_active = 1
+            ORDER BY a.week_number DESC, a.created_at DESC
+        """
+        return self._execute_query(query, fetch_all_dicts=True)
 
     def get_alerts_by_student_id(self, student_id: int) -> list[dict]:
         """
@@ -63,7 +89,16 @@ class AlertRepository(BaseRepository):
             list[dict]: A list of dictionaries, each representing an active alert
                         associated with the given student, including joined details.
         """
-        pass
+        query = """
+            SELECT a.id, a.student_id, a.module_id, a.week_number, a.reason, a.created_at, a.resolved, a.is_active,
+                   s.full_name AS student_name, m.module_title AS module_title
+            FROM alerts a
+            JOIN students s ON a.student_id = s.id
+            LEFT JOIN modules m ON a.module_id = m.id
+            WHERE a.student_id = ? AND a.is_active = 1
+            ORDER BY a.created_at DESC
+        """
+        return self._execute_query(query, (student_id,), fetch_all_dicts=True)
 
     def get_alert_by_id(self, alert_id: int) -> Alert | None:
         """
@@ -75,7 +110,7 @@ class AlertRepository(BaseRepository):
         Returns:
             Alert | None: An `Alert` object if found, otherwise None.
         """
-        pass
+        return super().get_by_id(alert_id)
 
     def mark_alert_resolved(self, alert_id: int) -> bool:
         """
@@ -87,7 +122,8 @@ class AlertRepository(BaseRepository):
         Returns:
             bool: True if the alert was successfully marked as resolved (i.e., a record was updated), False otherwise.
         """
-        pass
+        query = "UPDATE alerts SET resolved = 1 WHERE id = ?"
+        return self._execute_update_delete(query, (alert_id,))
     
     def delete_alert(self, alert_id: int) -> bool:
         """
@@ -99,7 +135,7 @@ class AlertRepository(BaseRepository):
         Returns:
             bool: True if the alert was successfully logically deleted, False otherwise.
         """
-        pass    
+        return super().delete_logical(alert_id)
 
     def create_alert(self, student_id: int, module_id: int | None, week_number: int, reason: str) -> Alert:
         """
@@ -114,7 +150,9 @@ class AlertRepository(BaseRepository):
         Returns:
             Alert: The newly created `Alert` object.
         """
-        pass
+        query = "INSERT INTO alerts (student_id, module_id, week_number, reason, resolved, is_active) VALUES (?, ?, ?, ?, 0, 1)"
+        alert_id = self._execute_insert(query, (student_id, module_id, week_number, reason))
+        return self.get_alert_by_id(alert_id)
 
 # Instantiate the repository for use throughout the application.
 alert_repository = AlertRepository()
