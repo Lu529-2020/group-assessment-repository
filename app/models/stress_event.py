@@ -53,7 +53,18 @@ class StressEvent(BaseModel):
         Returns:
             dict: A dictionary containing the stress event's attributes suitable for JSON serialization.
         """
-        pass
+        data = super().to_dict() # Get common fields from BaseModel.
+        data.update({
+            'student_id': self.student_id,
+            'module_id': self.module_id,
+            'survey_response_id': self.survey_response_id,
+            'week_number': self.week_number,
+            'stress_level': self.stress_level,
+            'cause_category': self.cause_category,
+            'description': self.description,
+            'source': self.source,
+        })
+        return data
 
     @classmethod
     def from_row(cls, row) -> 'StressEvent':
@@ -71,7 +82,39 @@ class StressEvent(BaseModel):
             StressEvent: A StressEvent instance populated with data from the row,
                          or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance:
+            return None
+
+        row_dict = dict(row) # Convert row to dict for easier access to specific fields.
+
+        # Extract stress event-specific fields.
+        student_id = row_dict.get('student_id')
+        module_id = row_dict.get('module_id')
+        survey_response_id = row_dict.get('survey_response_id')
+        week_number = row_dict.get('week_number')
+        stress_level = row_dict.get('stress_level')
+        cause_category = row_dict.get('cause_category')
+        description = row_dict.get('description')
+        source = row_dict.get('source')
+
+        return cls(
+            id=base_instance.id,
+            student_id=student_id,
+            module_id=module_id,
+            survey_response_id=survey_response_id,
+            week_number=week_number,
+            stress_level=stress_level,
+            cause_category=cause_category,
+            description=description,
+            source=source,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
     def __repr__(self) -> str:
         """
