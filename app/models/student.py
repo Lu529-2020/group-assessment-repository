@@ -47,7 +47,15 @@ class Student(BaseModel):
         Returns:
             dict: A dictionary containing the student's attributes suitable for JSON serialization.
         """
-        pass
+        data = super().to_dict() # Get common fields from BaseModel.
+        data.update({
+            'student_number': self.student_number,
+            'full_name': self.full_name,
+            'email': self.email,
+            'course_name': self.course_name,
+            'year_of_study': self.year_of_study,
+        })
+        return data
 
     @classmethod
     def from_row(cls, row) -> 'Student':
@@ -64,7 +72,33 @@ class Student(BaseModel):
         Returns:
             Student: A Student instance populated with data from the row, or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+        
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance:
+            return None
+
+        row_dict = dict(row) # Convert row to dict for easier access to specific fields.
+
+        # Extract student-specific fields.
+        student_number = row_dict.get('student_number')
+        full_name = row_dict.get('full_name')
+        email = row_dict.get('email')
+        course_name = row_dict.get('course_name')
+        year_of_study = row_dict.get('year_of_study')
+
+        return cls(
+            id=base_instance.id,
+            student_number=student_number,
+            full_name=full_name,
+            email=email,
+            course_name=course_name,
+            year_of_study=year_of_study,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
     def __repr__(self) -> str:
         """
