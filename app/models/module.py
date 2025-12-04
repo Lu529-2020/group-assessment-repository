@@ -45,7 +45,14 @@ class Module(BaseModel):
         Returns:
             dict: A dictionary containing the module's attributes suitable for JSON serialization.
         """
-        pass
+        data = super().to_dict() # Get common fields from BaseModel.
+        data.update({
+            'module_code': self.module_code,
+            'module_title': self.module_title,
+            'credit': self.credit,
+            'academic_year': self.academic_year,
+        })
+        return data
 
     @classmethod
     def from_row(cls, row) -> 'Module':
@@ -62,7 +69,31 @@ class Module(BaseModel):
         Returns:
             Module: A Module instance populated with data from the row, or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance:
+            return None
+
+        row_dict = dict(row) # Convert row to dict for easier access to specific fields.
+
+        # Extract module-specific fields.
+        module_code = row_dict.get('module_code')
+        module_title = row_dict.get('module_title')
+        credit = row_dict.get('credit')
+        academic_year = row_dict.get('academic_year')
+
+        return cls(
+            id=base_instance.id,
+            module_code=module_code,
+            module_title=module_title,
+            credit=credit,
+            academic_year=academic_year,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
     def __repr__(self) -> str:
         """
