@@ -39,7 +39,7 @@ class StudentRepository(BaseRepository):
         Returns:
             list[Student]: A list of `Student` objects representing all active (or all) students.
         """
-        pass
+        return super().get_all(include_inactive)
 
     def get_student_by_id(self, student_id: int, include_inactive: bool = False) -> Student | None:
         """
@@ -52,7 +52,7 @@ class StudentRepository(BaseRepository):
         Returns:
             Student | None: A `Student` object if found, otherwise None.
         """
-        pass
+        return super().get_by_id(student_id, include_inactive)
 
     def get_student_by_student_number(self, student_number: str) -> Student | None:
         """
@@ -64,7 +64,9 @@ class StudentRepository(BaseRepository):
         Returns:
             Student | None: A `Student` object if found, otherwise None.
         """
-        pass
+        query = "SELECT * FROM students WHERE student_number = ? AND is_active = 1"
+        return self._execute_query(query, (student_number,), fetch_one=True)
+
     def get_student_enrolments(self, student_id: int) -> list[dict]:
         """
         Retrieves all active enrolments for a specific student, including module details.
@@ -76,7 +78,31 @@ class StudentRepository(BaseRepository):
             list[dict]: A list of dictionaries, each representing an enrolment
                         with associated module code and title.
         """
-        pass
+        query = """
+            SELECT e.id, e.student_id, e.module_id, e.enrol_date, e.is_active,
+                   m.module_code, m.module_title
+            FROM enrolments e
+            JOIN modules m ON e.module_id = m.id
+            WHERE e.student_id = ? AND e.is_active = 1
+        """
+        # This method directly uses get_db() and db.execute(), so it needs its own try-except.
+        # The _execute_query method in BaseRepository would also work here.
+        try:
+            db = get_db()
+            cursor = db.execute(query, (student_id,))
+            enrolments = []
+            for row in cursor.fetchall():
+                enrolments.append({
+                    'id': row['id'],
+                    'module_id': row['module_id'],
+                    'module_code': row['module_code'],
+                    'module_title': row['module_title'],
+                    'enrol_date': row['enrol_date']
+                })
+            return enrolments
+        except sqlite3.Error as e:
+            current_app.logger.error(f"Database error in get_student_enrolments for student {student_id}: {e}", exc_info=True)
+            raise Exception(f"Could not retrieve enrolments for student {student_id}.")
 
     def create_student(self, student_number: str, full_name: str, email: str, course_name: str | None, year_of_study: int | None) -> Student:
         """
@@ -92,7 +118,9 @@ class StudentRepository(BaseRepository):
         Returns:
             Student: The newly created `Student` object.
         """
-        pass
+        query = "INSERT INTO students (student_number, full_name, email, course_name, year_of_study, is_active) VALUES (?, ?, ?, ?, ?, 1)"
+        student_id = self._execute_insert(query, (student_number, full_name, email, course_name, year_of_study))
+        return self.get_student_by_id(student_id)
 
     def update_student(self, student_id: int, student_number: str, full_name: str, email: str, course_name: str | None, year_of_study: int | None) -> Student:
         """
@@ -109,7 +137,9 @@ class StudentRepository(BaseRepository):
         Returns:
             Student: The updated `Student` object.
         """
-        pass
+        query = "UPDATE students SET student_number = ?, full_name = ?, email = ?, course_name = ?, year_of_study = ? WHERE id = ?"
+        self._execute_update_delete(query, (student_number, full_name, email, course_name, year_of_study, student_id))
+        return self.get_student_by_id(student_id)
 
     def delete_student(self, student_id: int) -> bool:
         """
@@ -121,7 +151,7 @@ class StudentRepository(BaseRepository):
         Returns:
             bool: True if the student was successfully logically deleted, False otherwise.
         """
-        pass
+        return super().delete_logical(student_id)
 
     def delete_student_hard(self, student_id: int) -> bool:
         """
@@ -135,7 +165,7 @@ class StudentRepository(BaseRepository):
         Returns:
             bool: True if the student was successfully permanently deleted, False otherwise.
         """
-        pass
+        return super().delete_hard(student_id)
 
 # Instantiate the repository for use throughout the application.
 student_repository = StudentRepository()
