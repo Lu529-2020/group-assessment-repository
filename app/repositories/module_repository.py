@@ -35,7 +35,7 @@ class ModuleRepository(BaseRepository):
         Returns:
             list[Module]: A list of `Module` objects representing all active modules.
         """
-        pass
+        return super().get_all()
 
     def get_module_by_id(self, module_id: int) -> Module | None:
         """
@@ -47,7 +47,7 @@ class ModuleRepository(BaseRepository):
         Returns:
             Module | None: A `Module` object if found, otherwise None.
         """
-        pass
+        return super().get_by_id(module_id)
 
     def create_module(self, module_code: str, module_title: str, credit: int, academic_year: str) -> Module:
         """
@@ -62,7 +62,9 @@ class ModuleRepository(BaseRepository):
         Returns:
             Module: The newly created `Module` object.
         """
-        pass
+        query = "INSERT INTO modules (module_code, module_title, credit, academic_year, is_active) VALUES (?, ?, ?, ?, 1)"
+        module_id = self._execute_insert(query, (module_code, module_title, credit, academic_year))
+        return self.get_module_by_id(module_id)
 
     def update_module(self, module_id: int, module_code: str, module_title: str, credit: int, academic_year: str) -> Module:
         """
@@ -78,7 +80,9 @@ class ModuleRepository(BaseRepository):
         Returns:
             Module: The updated `Module` object.
         """
-        pass
+        query = "UPDATE modules SET module_code = ?, module_title = ?, credit = ?, academic_year = ? WHERE id = ?"
+        self._execute_update_delete(query, (module_code, module_title, credit, academic_year, module_id))
+        return self.get_module_by_id(module_id)
 
     def delete_module(self, module_id: int) -> bool:
         """
@@ -90,7 +94,7 @@ class ModuleRepository(BaseRepository):
         Returns:
             bool: True if the module was successfully logically deleted, False otherwise.
         """
-        pass
+        return super().delete_logical(module_id)
 
 # Instantiate the repository for use throughout the application.
 module_repository = ModuleRepository()
