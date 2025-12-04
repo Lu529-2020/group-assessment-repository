@@ -53,7 +53,18 @@ class AttendanceRecord(BaseModel):
         Returns:
             dict: A dictionary containing the attendance record's attributes suitable for JSON serialization.
         """
-        pass
+        data = super().to_dict() # Get common fields from BaseModel.
+        data.update({
+            'student_id': self.student_id,
+            'module_id': self.module_id,
+            'week_number': self.week_number,
+            'attended_sessions': self.attended_sessions,
+            'total_sessions': self.total_sessions,
+            'attendance_rate': self.attendance_rate,
+            'student_name': self.student_name,
+            'module_title': self.module_title
+        })
+        return data
 
     @classmethod
     def from_row(cls, row) -> 'AttendanceRecord':
@@ -71,7 +82,39 @@ class AttendanceRecord(BaseModel):
             AttendanceRecord: An AttendanceRecord instance populated with data from the row,
                               or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+        
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance:
+            return None
+
+        row_dict = dict(row) # Convert row to dict for easier access to specific fields.
+        
+        # Extract record-specific fields.
+        student_id = row_dict.get('student_id')
+        module_id = row_dict.get('module_id')
+        week_number = row_dict.get('week_number')
+        attended_sessions = row_dict.get('attended_sessions')
+        total_sessions = row_dict.get('total_sessions')
+        attendance_rate = row_dict.get('attendance_rate')
+        student_name = row_dict.get('student_name')
+        module_title = row_dict.get('module_title')
+
+        return cls(
+            id=base_instance.id,
+            student_id=student_id,
+            module_id=module_id,
+            week_number=week_number,
+            attended_sessions=attended_sessions,
+            total_sessions=total_sessions,
+            attendance_rate=attendance_rate,
+            student_name=student_name,
+            module_title=module_title,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
     def __repr__(self) -> str:
         """
