@@ -47,7 +47,15 @@ class Alert(BaseModel):
         Returns:
             dict: A dictionary containing the alert's attributes suitable for JSON serialization.
         """
-        pass
+        data = super().to_dict() # Get common fields from BaseModel.
+        data.update({
+            'student_id': self.student_id,
+            'module_id': self.module_id,
+            'week_number': self.week_number,
+            'reason': self.reason,
+            'resolved': self.resolved,
+        })
+        return data
 
     @classmethod
     def from_row(cls, row) -> 'Alert':
@@ -64,7 +72,33 @@ class Alert(BaseModel):
         Returns:
             Alert: An Alert instance populated with data from the row, or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+        
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance:
+            return None
+
+        row_dict = dict(row) # Convert row to dict for easier access to specific fields.
+        
+        # Extract alert-specific fields.
+        student_id = row_dict.get('student_id')
+        module_id = row_dict.get('module_id')
+        week_number = row_dict.get('week_number')
+        reason = row_dict.get('reason')
+        resolved = bool(row_dict.get('resolved'))
+
+        return cls(
+            id=base_instance.id,
+            student_id=student_id,
+            module_id=module_id,
+            week_number=week_number,
+            reason=reason,
+            resolved=resolved,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
     def __repr__(self) -> str:
         """
