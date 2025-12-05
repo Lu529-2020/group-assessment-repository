@@ -38,7 +38,16 @@ class EnrolmentRepository(BaseRepository):
             list[dict]: A list of dictionaries, where each dictionary represents
                         an enrolment with joined student and module details.
         """
-        pass
+        query = """
+            SELECT e.id, e.student_id, e.module_id, e.enrol_date, e.is_active,
+                   s.full_name AS student_name, m.module_title AS module_title
+            FROM enrolments e
+            JOIN students s ON e.student_id = s.id
+            JOIN modules m ON e.module_id = m.id
+            WHERE e.is_active = 1
+        """
+        # _execute_query handles exceptions and returns results as dictionaries due to fetch_all_dicts=True.
+        return self._execute_query(query, fetch_all_dicts=True)
 
     def get_enrolment_by_id(self, enrolment_id: int) -> Enrolment | None:
         """
@@ -50,7 +59,7 @@ class EnrolmentRepository(BaseRepository):
         Returns:
             Enrolment | None: An `Enrolment` object if found, otherwise None.
         """
-        pass
+        return super().get_by_id(enrolment_id)
 
     def create_enrolment(self, student_id: int, module_id: int, enrol_date: str | None = None) -> Enrolment:
         """
@@ -64,7 +73,12 @@ class EnrolmentRepository(BaseRepository):
         Returns:
             Enrolment: The newly created `Enrolment` object.
         """
-        pass
+        # Default enrol_date to current UTC date if not provided.
+        if enrol_date is None:
+            enrol_date = datetime.now(timezone.utc).date().isoformat()
+        query = "INSERT INTO enrolments (student_id, module_id, enrol_date, is_active) VALUES (?, ?, ?, 1)"
+        enrolment_id = self._execute_insert(query, (student_id, module_id, enrol_date))
+        return self.get_enrolment_by_id(enrolment_id)
 
     def update_enrolment(self, enrolment_id: int, student_id: int, module_id: int, enrol_date: str) -> Enrolment:
         """
@@ -79,7 +93,9 @@ class EnrolmentRepository(BaseRepository):
         Returns:
             Enrolment: The updated `Enrolment` object.
         """
-        pass
+        query = "UPDATE enrolments SET student_id = ?, module_id = ?, enrol_date = ? WHERE id = ?"
+        self._execute_update_delete(query, (student_id, module_id, enrol_date, enrolment_id))
+        return self.get_enrolment_by_id(enrolment_id)
 
     def delete_enrolment(self, enrolment_id: int) -> bool:
         """
@@ -91,7 +107,7 @@ class EnrolmentRepository(BaseRepository):
         Returns:
             bool: True if the enrolment was successfully logically deleted, False otherwise.
         """
-        pass
+        return super().delete_logical(enrolment_id)
 
 # Instantiate the repository for use throughout the application.
 enrolment_repository = EnrolmentRepository()
