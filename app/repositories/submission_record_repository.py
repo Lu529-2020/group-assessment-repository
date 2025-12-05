@@ -37,7 +37,16 @@ class SubmissionRecordRepository(BaseRepository):
             list[dict]: A list of dictionaries, where each dictionary represents
                         a submission record with joined student and module details.
         """
-        pass
+        query = """
+            SELECT sr.id, sr.student_id, sr.module_id, sr.assessment_name, sr.due_date, sr.submitted_date, sr.is_submitted, sr.is_late, sr.is_active,
+                   s.full_name AS student_name, m.module_title AS module_title
+            FROM submission_records sr
+            JOIN students s ON sr.student_id = s.id
+            JOIN modules m ON sr.module_id = m.id
+            WHERE sr.is_active = 1
+        """
+        # _execute_query handles exceptions and returns results as dictionaries due to fetch_all_dicts=True.
+        return self._execute_query(query, fetch_all_dicts=True)
 
     def get_submission_record_by_id(self, record_id: int) -> SubmissionRecord | None:
         """
@@ -49,7 +58,7 @@ class SubmissionRecordRepository(BaseRepository):
         Returns:
             SubmissionRecord | None: A `SubmissionRecord` object if found, otherwise None.
         """
-        pass
+        return super().get_by_id(record_id)
 
     def create_submission_record(self, student_id: int, module_id: int, assessment_name: str, due_date: str, submitted_date: str | None, is_submitted: bool, is_late: bool) -> SubmissionRecord:
         """
@@ -67,7 +76,12 @@ class SubmissionRecordRepository(BaseRepository):
         Returns:
             SubmissionRecord: The newly created `SubmissionRecord` object.
         """
-        pass
+        query = """
+            INSERT INTO submission_records (student_id, module_id, assessment_name, due_date, submitted_date, is_submitted, is_late, is_active) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """
+        record_id = self._execute_insert(query, (student_id, module_id, assessment_name, due_date, submitted_date, is_submitted, is_late))
+        return self.get_submission_record_by_id(record_id)
 
     def update_submission_record(self, record_id: int, student_id: int, module_id: int, assessment_name: str, due_date: str, submitted_date: str | None, is_submitted: bool, is_late: bool) -> SubmissionRecord:
         """
@@ -86,7 +100,12 @@ class SubmissionRecordRepository(BaseRepository):
         Returns:
             SubmissionRecord: The updated `SubmissionRecord` object.
         """
-        pass
+        query = """
+            UPDATE submission_records SET student_id = ?, module_id = ?, assessment_name = ?, due_date = ?, submitted_date = ?, is_submitted = ?, is_late = ? 
+            WHERE id = ?
+        """
+        self._execute_update_delete(query, (student_id, module_id, assessment_name, due_date, submitted_date, is_submitted, is_late, record_id))
+        return self.get_submission_record_by_id(record_id)
 
     def delete_submission_record(self, record_id: int) -> bool:
         """
@@ -98,8 +117,7 @@ class SubmissionRecordRepository(BaseRepository):
         Returns:
             bool: True if the record was successfully logically deleted, False otherwise.
         """
-        pass
+        return super().delete_logical(record_id)
 
 # Instantiate the repository for use throughout the application.
 submission_record_repository = SubmissionRecordRepository()
-
