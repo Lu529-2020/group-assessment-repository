@@ -47,7 +47,7 @@ class AttendanceRecordRepository(BaseRepository):
             WHERE ar.is_active = 1
         """
         # _execute_query handles exceptions and returns results as dictionaries due to fetch_all_dicts=True.
-        pass
+        return self._execute_query(query, fetch_all_dicts=True)
 
     def get_attendance_record_by_id(self, record_id: int) -> AttendanceRecord | None:
         """
@@ -59,7 +59,7 @@ class AttendanceRecordRepository(BaseRepository):
         Returns:
             AttendanceRecord | None: An `AttendanceRecord` object if found, otherwise None.
         """
-        pass
+        return super().get_by_id(record_id)
 
     def create_attendance_record(self, student_id: int, module_id: int, week_number: int, attended_sessions: int, total_sessions: int) -> AttendanceRecord:
         """
@@ -84,7 +84,7 @@ class AttendanceRecordRepository(BaseRepository):
             VALUES (?, ?, ?, ?, ?, ?, 1)
         """
         record_id = self._execute_insert(query, (student_id, module_id, week_number, attended_sessions, total_sessions, attendance_rate))
-        pass
+        return self.get_attendance_record_by_id(record_id)
 
     def update_attendance_record(self, record_id: int, student_id: int, module_id: int, week_number: int, attended_sessions: int, total_sessions: int) -> AttendanceRecord:
         """
@@ -110,7 +110,7 @@ class AttendanceRecordRepository(BaseRepository):
             WHERE id = ?
         """
         self._execute_update_delete(query, (student_id, module_id, week_number, attended_sessions, total_sessions, attendance_rate, record_id))
-        pass
+        return self.get_attendance_record_by_id(record_id)
 
     def delete_attendance_record(self, record_id: int) -> bool:
         """
@@ -122,7 +122,7 @@ class AttendanceRecordRepository(BaseRepository):
         Returns:
             bool: True if the record was successfully logically deleted, False otherwise.
         """
-        pass
+        return super().delete_logical(record_id)
 
 # Instantiate the repository for use throughout the application.
 attendance_record_repository = AttendanceRecordRepository()
