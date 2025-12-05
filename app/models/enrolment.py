@@ -61,7 +61,19 @@ class Enrolment(BaseModel):
         Returns:
             dict: A dictionary containing the enrolment's attributes suitable for JSON serialization.
         """
-        pass
+        data = super().to_dict()  # Get common fields from BaseModel.
+        # Convert date object to ISO 8601 string for JSON serialization.
+        enrol_date_str = self.enrol_date.isoformat() if isinstance(self.enrol_date,
+                                                                   (datetime, date)) else self.enrol_date
+
+        data.update({
+            'student_id': self.student_id,
+            'module_id': self.module_id,
+            'enrol_date': enrol_date_str,
+            'student_name': self.student_name,
+            'module_title': self.module_title
+        })
+        return data
 
     @classmethod
     def from_row(cls, row) -> 'Enrolment':
@@ -79,7 +91,54 @@ class Enrolment(BaseModel):
             Enrolment: An Enrolment instance populated with data from the row,
                        or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance:
+            return None
+
+        row_dict = dict(row)  # Convert row to dict for easier access to specific fields.
+
+        # Extract enrolment-specific fields.
+        student_id = row_dict.get('student_id')
+        module_id = row_dict.get('module_id')
+
+        enrol_date_obj = None
+        enrol_date_str = row_dict.get('enrol_date')
+        if enrol_date_str:
+            try:
+                enrol_date_obj = datetime.fromisoformat(enrol_date_str).date()
+            except ValueError:
+                # Fallback for date-only string if fromisoformat fails on full datetime string.
+                try:
+                    enrol_date_obj = date.fromisoformat(enrol_date_str)
+                except ValueError:
+                    if current_app:
+                        current_app.logger.warning(
+                            f"Invalid date format for 'enrol_date': '{enrol_date_str}' "
+                            f"for enrolment ID {row_dict.get('id')}. Setting to None."
+                        )
+                    else:
+                        print(
+                            f"WARNING: Invalid date format for 'enrol_date': '{enrol_date_str}' "
+                            f"for enrolment ID {row_dict.get('id')}. Setting to None."
+                        )
+
+        student_name = row_dict.get('student_name')
+        module_title = row_dict.get('module_title')
+
+        return cls(
+            id=base_instance.id,
+            student_id=student_id,
+            module_id=module_id,
+            enrol_date=enrol_date_obj,
+            student_name=student_name,
+            module_title=module_title,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
     def __repr__(self) -> str:
         """
