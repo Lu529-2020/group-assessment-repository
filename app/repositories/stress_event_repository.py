@@ -6,14 +6,6 @@ for interacting with the 'stress_events' table in the database. It extends
 `BaseRepository` to handle CRUD operations for stress events, including
 retrieving, creating, updating, and logically deleting event records.
 """
-"""
-Stress Event Repository module for managing student stress event data.
-
-This module defines the `StressEventRepository` class, which provides methods
-for interacting with the 'stress_events' table in the database. It extends
-`BaseRepository` to handle CRUD operations for stress events, including
-retrieving, creating, updating, and logically deleting event records.
-"""
 
 import sqlite3
 from app.db_connection import get_db
@@ -44,7 +36,7 @@ class StressEventRepository(BaseRepository):
         Returns:
             list[StressEvent]: A list of `StressEvent` objects representing all active events.
         """
-        pass
+        return super().get_all()
 
     def get_stress_event_by_id(self, event_id: int) -> StressEvent | None:
         """
@@ -56,7 +48,7 @@ class StressEventRepository(BaseRepository):
         Returns:
             StressEvent | None: A `StressEvent` object if found, otherwise None.
         """
-        pass
+        return super().get_by_id(event_id)
 
     def create_stress_event(self, student_id: int, module_id: int | None, survey_response_id: int | None, week_number: int, stress_level: int, cause_category: str, description: str | None, source: str) -> StressEvent:
         """
@@ -75,7 +67,13 @@ class StressEventRepository(BaseRepository):
         Returns:
             StressEvent: The newly created `StressEvent` object.
         """
-        pass
+        created_at = datetime.now(timezone.utc).isoformat() # Set creation timestamp.
+        query = """
+            INSERT INTO stress_events (student_id, module_id, survey_response_id, week_number, stress_level, cause_category, description, source, created_at, is_active) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """
+        event_id = self._execute_insert(query, (student_id, module_id, survey_response_id, week_number, stress_level, cause_category, description, source, created_at))
+        return self.get_stress_event_by_id(event_id)
 
     def update_stress_event(self, event_id: int, student_id: int, module_id: int | None, survey_response_id: int | None, week_number: int, stress_level: int, cause_category: str, description: str | None, source: str) -> StressEvent:
         """
@@ -95,7 +93,12 @@ class StressEventRepository(BaseRepository):
         Returns:
             StressEvent: The updated `StressEvent` object.
         """
-        pass
+        query = """
+            UPDATE stress_events SET student_id = ?, module_id = ?, survey_response_id = ?, week_number = ?, stress_level = ?, cause_category = ?, description = ?, source = ? 
+            WHERE id = ?
+        """
+        self._execute_update_delete(query, (student_id, module_id, survey_response_id, week_number, stress_level, cause_category, description, source, event_id))
+        return self.get_stress_event_by_id(event_id)
 
     def delete_stress_event(self, event_id: int) -> bool:
         """
@@ -107,7 +110,7 @@ class StressEventRepository(BaseRepository):
         Returns:
             bool: True if the event was successfully logically deleted, False otherwise.
         """
-        pass
+        return super().delete_logical(event_id)
 
 # Instantiate the repository for use throughout the application.
 stress_event_repository = StressEventRepository()
