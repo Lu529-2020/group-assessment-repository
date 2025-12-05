@@ -54,7 +54,18 @@ class SubmissionRecord(BaseModel):
 
     def _parse_date_field(self, date_value, field_name: str):
         """Helper to parse date/datetime strings safely."""
-        pass
+        if isinstance(date_value, str):
+            try:
+                return datetime.fromisoformat(date_value)
+            except (ValueError, TypeError):
+                if current_app:
+                    current_app.logger.warning(
+                        f"Invalid datetime format for '{field_name}': '{date_value}'. Setting to None."
+                    )
+                else:
+                    print(f"WARNING: Invalid datetime format for '{field_name}': '{date_value}'. Setting to None.")
+                return None
+        return date_value
 
     def to_dict(self) -> dict:
         """
@@ -63,7 +74,20 @@ class SubmissionRecord(BaseModel):
         Returns:
             dict: A dictionary containing the submission record's attributes suitable for JSON serialization.
         """
-        pass
+        data = super().to_dict()  # Get common fields from BaseModel.
+        data.update({
+            'student_id': self.student_id,
+            'module_id': self.module_id,
+            'assessment_name': self.assessment_name,
+            # Convert datetime objects to ISO 8601 strings for JSON serialization.
+            'due_date': self.due_date.isoformat() if self.due_date else None,
+            'submitted_date': self.submitted_date.isoformat() if self.submitted_date else None,
+            'is_submitted': self.is_submitted,
+            'is_late': self.is_late,
+            'student_name': self.student_name,
+            'module_title': self.module_title
+        })
+        return data
 
 
     @classmethod
@@ -82,7 +106,62 @@ class SubmissionRecord(BaseModel):
             SubmissionRecord: A SubmissionRecord instance populated with data from the row,
                               or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance:
+            return None
+
+        row_dict = dict(row)  # Convert row to dict for easier access to specific fields.
+
+        # Helper to parse date strings safely within from_row.
+        def _parse_date_from_row(date_str_value, field_name):
+            if not isinstance(date_str_value, str):
+                return date_str_value
+            try:
+                return datetime.fromisoformat(date_str_value)
+            except (ValueError, TypeError):
+                if current_app:
+                    current_app.logger.warning(
+                        f"Invalid datetime format for '{field_name}': '{date_str_value}' "
+                        f"for record ID {row_dict.get('id')}. Setting to None."
+                    )
+                else:
+                    print(
+                        f"WARNING: Invalid datetime format for '{field_name}': '{date_str_value}' "
+                        f"for record ID {row_dict.get('id')}. Setting to None."
+                    )
+                return None
+
+        # Extract record-specific fields.
+        student_id = row_dict.get('student_id')
+        module_id = row_dict.get('module_id')
+        assessment_name = row_dict.get('assessment_name')
+
+        due_date = _parse_date_from_row(row_dict.get('due_date'), 'due_date')
+        submitted_date = _parse_date_from_row(row_dict.get('submitted_date'), 'submitted_date')
+
+        is_submitted = bool(row_dict.get('is_submitted'))
+        is_late = bool(row_dict.get('is_late'))
+        student_name = row_dict.get('student_name')
+        module_title = row_dict.get('module_title')
+
+        return cls(
+            id=base_instance.id,
+            student_id=student_id,
+            module_id=module_id,
+            assessment_name=assessment_name,
+            due_date=due_date,
+            submitted_date=submitted_date,
+            is_submitted=is_submitted,
+            is_late=is_late,
+            student_name=student_name,
+            module_title=module_title,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
 
     def __repr__(self) -> str:
