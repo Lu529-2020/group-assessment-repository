@@ -6,6 +6,7 @@ score or evaluation for a specific assessment within a module. It inherits
 from `BaseModel` for common fields and includes attributes for linking
 students and modules, assessment name, and the grade value.
 """
+
 from datetime import datetime
 from .base_model import BaseModel
 
@@ -50,7 +51,16 @@ class Grade(BaseModel):
         Returns:
             dict: A dictionary containing the grade's attributes suitable for JSON serialization.
         """
-        pass
+        data = super().to_dict()  # Get common fields from BaseModel.
+        data.update({
+            'student_id': self.student_id,
+            'module_id': self.module_id,
+            'assessment_name': self.assessment_name,
+            'grade': self.grade,
+            'student_name': self.student_name,
+            'module_title': self.module_title
+        })
+        return data
 
     @classmethod
     def from_row(cls, row) -> 'Grade':
@@ -67,11 +77,34 @@ class Grade(BaseModel):
         Returns:
             Grade: A Grade instance populated with data from the row, or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance:
+            return None
+
+        row_dict = dict(row)  # Convert row to dict for easier access to specific fields.
+
+        # Extract grade-specific fields.
+        student_id = row_dict.get('student_id')
+        module_id = row_dict.get('module_id')
+        assessment_name = row_dict.get('assessment_name')
+        grade = row_dict.get('grade')
+
+        return cls(
+            id=base_instance.id,
+            student_id=student_id,
+            module_id=module_id,
+            assessment_name=assessment_name,
+            grade=grade,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
     def __repr__(self) -> str:
         """
         Returns a string representation of the Grade object, useful for debugging.
         """
         return f'<Grade ID: {self.id}, Student: {self.student_id}, Assessment: "{self.assessment_name}">'
-
