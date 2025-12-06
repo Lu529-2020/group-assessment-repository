@@ -49,7 +49,16 @@ class SurveyResponse(BaseModel):
         Returns:
             dict: A dictionary containing the survey response's attributes suitable for JSON serialization.
         """
-        pass
+        data = super(SurveyResponse, self).to_dict() # Get common fields from BaseModel.
+        data.update({
+            'student_id': self.student_id,
+            'module_id': self.module_id,
+            'week_number': self.week_number,
+            'stress_level': self.stress_level,
+            'hours_slept': self.hours_slept,
+            'mood_comment': self.mood_comment,
+        })
+        return data
 
     @classmethod
     def from_row(cls, row) -> 'SurveyResponse':
@@ -67,7 +76,35 @@ class SurveyResponse(BaseModel):
             SurveyResponse: A SurveyResponse instance populated with data from the row,
                             or None if the row is None.
         """
-        pass
+        if row is None:
+            return None
+
+        # Use BaseModel's from_row to parse common fields.
+        base_instance = BaseModel.from_row(row)
+        if not base_instance:
+            return None
+
+        row_dict = dict(row) # Convert row to dict for easier access to specific fields.
+
+        # Extract response-specific fields.
+        student_id = row_dict.get('student_id')
+        module_id = row_dict.get('module_id')
+        week_number = row_dict.get('week_number')
+        stress_level = row_dict.get('stress_level')
+        hours_slept = row_dict.get('hours_slept')
+        mood_comment = row_dict.get('mood_comment')
+
+        return cls(
+            id=base_instance.id,
+            student_id=student_id,
+            module_id=module_id,
+            week_number=week_number,
+            stress_level=stress_level,
+            hours_slept=hours_slept,
+            mood_comment=mood_comment,
+            is_active=base_instance.is_active,
+            created_at=base_instance.created_at
+        )
 
     def __repr__(self) -> str:
         """
