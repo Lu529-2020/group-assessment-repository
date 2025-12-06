@@ -43,7 +43,19 @@ class SurveyResponseRepository(BaseRepository):
             list[dict]: A list of dictionaries, where each dictionary represents
                         a survey response with joined student and module details.
         """
-        pass
+        query = """
+            SELECT 
+                sr.id, sr.student_id, sr.module_id, sr.week_number, 
+                sr.stress_level, sr.hours_slept, sr.mood_comment, sr.created_at,
+                s.full_name as student_name,
+                m.module_title as module_title
+            FROM survey_responses sr
+            LEFT JOIN students s ON sr.student_id = s.id
+            LEFT JOIN modules m ON sr.module_id = m.id
+            WHERE sr.is_active = 1
+        """
+        # _execute_query handles exceptions and returns results as dictionaries due to fetch_all_dicts=True.
+        return self._execute_query(query, fetch_all_dicts=True)
 
     def get_survey_response_by_id(self, response_id: int) -> SurveyResponse | None:
         """
@@ -55,7 +67,7 @@ class SurveyResponseRepository(BaseRepository):
         Returns:
             SurveyResponse | None: A `SurveyResponse` object if found, otherwise None.
         """
-        pass
+        return super().get_by_id(response_id)
 
     def create_survey_response(self, student_id: int, module_id: int | None, week_number: int, stress_level: int, hours_slept: float, mood_comment: str | None) -> SurveyResponse:
         """
@@ -75,7 +87,17 @@ class SurveyResponseRepository(BaseRepository):
         Returns:
             SurveyResponse: The newly created `SurveyResponse` object.
         """
-        pass
+        created_at = datetime.now(timezone.utc).isoformat()
+        query = """
+            INSERT INTO survey_responses (student_id, module_id, week_number, stress_level, hours_slept, mood_comment, created_at, is_active) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """
+        response_id = self._execute_insert(query, (student_id, module_id, week_number, stress_level, hours_slept, mood_comment, created_at))
+        new_survey = self.get_survey_response_by_id(response_id)
+        if new_survey:
+            # Trigger the check for stress events and alerts.
+            self._check_for_stress_events_and_alerts(new_survey)
+        return new_survey
 
     def update_survey_response(self, response_id: int, student_id: int, module_id: int | None, week_number: int, stress_level: int, hours_slept: float, mood_comment: str | None) -> SurveyResponse:
         """
@@ -96,7 +118,16 @@ class SurveyResponseRepository(BaseRepository):
         Returns:
             SurveyResponse: The updated `SurveyResponse` object.
         """
-        pass
+        query = """
+            UPDATE survey_responses SET student_id = ?, module_id = ?, week_number = ?, stress_level = ?, hours_slept = ?, mood_comment = ? 
+            WHERE id = ?
+        """
+        self._execute_update_delete(query, (student_id, module_id, week_number, stress_level, hours_slept, mood_comment, response_id))
+        updated_survey = self.get_survey_response_by_id(response_id)
+        if updated_survey:
+            # Trigger the check for stress events and alerts after update.
+            self._check_for_stress_events_and_alerts(updated_survey)
+        return updated_survey
 
     def delete_survey_response(self, response_id: int) -> bool:
         """
@@ -108,7 +139,7 @@ class SurveyResponseRepository(BaseRepository):
         Returns:
             bool: True if the survey response was successfully logically deleted, False otherwise.
         """
-        pass
+        return super().delete_logical(response_id)
 
     def _check_for_stress_events_and_alerts(self, survey_response: SurveyResponse, threshold: int = 4):
         """
@@ -126,7 +157,56 @@ class SurveyResponseRepository(BaseRepository):
         Raises:
             Exception: If a database error occurs during the check or creation of events/alerts.
         """
-        pass
+        db = get_db()
+        try:
+            # 1. Check for StressEvent: If stress level is high, record a stress event.
+            if survey_response.stress_level >= threshold:
+                # Check if an event for this survey response already exists to prevent duplicates.
+                cursor = db.execute("SELECT id FROM stress_events WHERE survey_response_id = ?", (survey_response.id,))
+                existing_event = cursor.fetchone()
+                if not existing_event:
+                    stress_event_created_at = datetime.now(timezone.utc).isoformat()
+                    db.execute(
+                        "INSERT INTO stress_events (student_id, module_id, survey_response_id, week_number, stress_level, cause_category, description, source, created_at, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+                        (survey_response.student_id, survey_response.module_id, survey_response.id, survey_response.week_number, survey_response.stress_level, "system_detected", f"High stress reported (level {survey_response.stress_level}) in week {survey_response.week_number}.", "survey_response_system", stress_event_created_at)
+                    )
+                    db.commit()
+                    current_app.logger.info(f"Stress event created for student {survey_response.student_id} (level {survey_response.stress_level}).")
+
+            # 2. Check for Alerts: Identify consecutive high stress levels.
+            # Retrieve the survey response from the previous week for the same student and module.
+            cursor = db.execute("""
+                SELECT week_number, stress_level FROM survey_responses
+                WHERE student_id = ? AND module_id = ? AND week_number = ? AND is_active = 1
+            """, (survey_response.student_id, survey_response.module_id, survey_response.week_number - 1))
+            previous_week_survey_row = cursor.fetchone()
+
+            # If both current and previous week's stress levels are above the threshold, create an alert.
+            if previous_week_survey_row and \
+               previous_week_survey_row['stress_level'] >= threshold and \
+               survey_response.stress_level >= threshold:
+
+                # Check if an alert for this specific week already exists to prevent duplicates.
+                cursor = db.execute("SELECT id FROM alerts WHERE student_id = ? AND week_number = ? AND is_active = 1", (survey_response.student_id, survey_response.week_number))
+                existing_alert = cursor.fetchone()
+
+                if not existing_alert:
+                    alert_created_at = datetime.now(timezone.utc).isoformat()
+                    alert_reason = (
+                        f"Stress level >= {threshold} for two consecutive weeks "
+                        f"({survey_response.week_number - 1} and {survey_response.week_number}) "
+                        f"for student {survey_response.student_id} in module {survey_response.module_id}."
+                    )
+                    db.execute(
+                        "INSERT INTO alerts (student_id, module_id, week_number, reason, created_at, resolved, is_active) VALUES (?, ?, ?, ?, ?, 0, 1)",
+                        (survey_response.student_id, survey_response.module_id, survey_response.week_number, alert_reason, alert_created_at)
+                    )
+                    db.commit()
+                    current_app.logger.warning(f"Alert created for student {survey_response.student_id}: Consecutive high stress detected.")
+        except sqlite3.Error as e:
+            db.rollback() # Rollback changes if any database error occurs during this process.
+            current_app.logger.error(f"Database error in _check_for_stress_events_and_alerts: {e}", exc_info=True)
+            raise Exception("Error checking for stress events and alerts.") # Re-raise for higher-level handling.
 
 # Instantiate the repository for use throughout the application.
 survey_response_repository = SurveyResponseRepository()
